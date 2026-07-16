@@ -25,7 +25,7 @@ README.md                      usage + holiday list
 - [ ] Mar 11 — Day of Restoration of Independence
 - [ ] May 1 — International Labour Day
 - [ ] Jun 24 — Midsummer Day (Joninės)
-- [ ] Jul 6 — Statehood Day
+- [ ] Jul 6 — Statehood Day (King Mindaugas's Coronation Day)
 - [ ] Aug 15 — Assumption Day (Žolinė)
 - [ ] Nov 1 — All Saints' Day
 - [ ] Nov 2 — All Souls' Day (Vėlinės)
