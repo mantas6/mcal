@@ -31,6 +31,14 @@ const (
 	reverseOff = "\x1b[27m"
 	redOn      = "\x1b[31m"
 	redOff     = "\x1b[39m"
+	// grayOn/grayOff dim passed (past) day numbers. Bright-black (90) is used
+	// rather than faint (2) for wider terminal support and because faint shares
+	// its reset (22m) with bold, which would clash when both apply.
+	grayOn  = "\x1b[90m"
+	grayOff = "\x1b[39m"
+	// boldOn/boldOff embolden weekend day numbers.
+	boldOn  = "\x1b[1m"
+	boldOff = "\x1b[22m"
 )
 
 // dayHeader is the Monday-first English weekday header (exactly gridWidth wide).
@@ -179,16 +187,45 @@ func monthBlock(year int, month time.Month, showYear bool, opt Options) []string
 	return lines
 }
 
-// renderCell renders a single day cell, applying today reverse-video and
-// holiday coloring where enabled.
+// renderCell renders a single day cell, applying date-based styling (gray for
+// passed days, bold for weekends), holiday coloring and the today highlight
+// where enabled.
+//
+// Styling rules (only when opt.Color is true; plain output is byte-identical
+// to the color-off path):
+//   - Foreground color layer: a holiday (when the style marks it) is red and
+//     takes precedence over gray, so past holidays stay red rather than dim.
+//     Otherwise a strictly-past day (compared by calendar date, not time of
+//     day) is gray. Today is never gray.
+//   - Bold weekends: Saturday/Sunday are bold regardless of holiday marking or
+//     gray state, so a past weekday is gray, a past weekend is gray + bold, and
+//     a weekend holiday is red + bold.
+//   - The today reverse-video highlight wraps everything, so today on a weekend
+//     is reverse video + bold.
 func renderCell(day int, d time.Time, opt Options) string {
 	cell := fmt.Sprintf("%*d", cellWidth, day)
+	if !opt.Color {
+		return cell
+	}
 
 	isHoliday, _ := holidays.IsHoliday(d)
-	if opt.Color && opt.HolidayStyle.wantsColor() && isHoliday {
+	isToday := sameDay(d, opt.Today)
+
+	// Foreground color: holiday red beats gray; otherwise dim passed days.
+	switch {
+	case opt.HolidayStyle.wantsColor() && isHoliday:
 		cell = redOn + cell + redOff
+	case beforeDay(d, opt.Today):
+		cell = grayOn + cell + grayOff
 	}
-	if opt.Color && sameDay(d, opt.Today) {
+
+	// Weekend emphasis, independent of holiday marking and gray state.
+	if wd := d.Weekday(); wd == time.Saturday || wd == time.Sunday {
+		cell = boldOn + cell + boldOff
+	}
+
+	// Today highlight wraps any inner styling.
+	if isToday {
 		cell = reverseOn + cell + reverseOff
 	}
 	return cell
@@ -260,4 +297,18 @@ func sameDay(a, b time.Time) bool {
 	ay, am, ad := a.Date()
 	by, bm, bd := b.Date()
 	return ay == by && am == bm && ad == bd
+}
+
+// beforeDay reports whether a falls strictly before b by calendar date,
+// ignoring the time of day.
+func beforeDay(a, b time.Time) bool {
+	ay, am, ad := a.Date()
+	by, bm, bd := b.Date()
+	if ay != by {
+		return ay < by
+	}
+	if am != bm {
+		return am < bm
+	}
+	return ad < bd
 }

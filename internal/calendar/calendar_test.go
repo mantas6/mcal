@@ -173,6 +173,93 @@ func TestTodayHighlightColorOnOff(t *testing.T) {
 	}
 }
 
+func TestPastDaysGray(t *testing.T) {
+	// July 2025: 14th is a past weekday, 15th is today, 16th is future.
+	today := time.Date(2025, time.July, 15, 0, 0, 0, 0, time.UTC)
+	got := RenderMonth(2025, time.July, Options{Today: today, Color: true, HolidayStyle: StyleNone})
+
+	// Past weekday (Mon Jul 14) must be gray.
+	if !strings.Contains(got, grayOn+"14"+grayOff) {
+		t.Errorf("past day not grayed:\n%q", got)
+	}
+	// Today (Jul 15) must not be gray; it keeps the reverse highlight.
+	if strings.Contains(got, grayOn+"15") {
+		t.Errorf("today must not be grayed:\n%q", got)
+	}
+	if !strings.Contains(got, reverseOn+"15"+reverseOff) {
+		t.Errorf("today must keep reverse highlight:\n%q", got)
+	}
+	// Future weekday (Wed Jul 16) must not be gray.
+	if strings.Contains(got, grayOn+"16") {
+		t.Errorf("future day must not be grayed:\n%q", got)
+	}
+}
+
+func TestWeekendBold(t *testing.T) {
+	// Reference today far in the past so no gray styling interferes.
+	got := RenderMonth(2025, time.July, Options{Today: refDay, Color: true, HolidayStyle: StyleNone})
+
+	// Saturday Jul 5 must be bold.
+	if !strings.Contains(got, boldOn+" 5"+boldOff) {
+		t.Errorf("Saturday not bold:\n%q", got)
+	}
+	// Sunday Jul 6 must be bold.
+	if !strings.Contains(got, boldOn+" 6"+boldOff) {
+		t.Errorf("Sunday not bold:\n%q", got)
+	}
+	// Weekday Tue Jul 1 must not be bold.
+	if strings.Contains(got, boldOn+" 1") {
+		t.Errorf("weekday must not be bold:\n%q", got)
+	}
+}
+
+func TestPastWeekendGrayAndBold(t *testing.T) {
+	// today Jul 15 2025 -> Sat Jul 5 is a past weekend: gray + bold.
+	today := time.Date(2025, time.July, 15, 0, 0, 0, 0, time.UTC)
+	got := RenderMonth(2025, time.July, Options{Today: today, Color: true, HolidayStyle: StyleNone})
+
+	if !strings.Contains(got, boldOn+grayOn+" 5"+grayOff+boldOff) {
+		t.Errorf("past weekend not gray+bold:\n%q", got)
+	}
+}
+
+func TestTodayOnWeekendReverseAndBold(t *testing.T) {
+	// today Sat Jul 19 2025 -> reverse video + bold, and not gray.
+	today := time.Date(2025, time.July, 19, 0, 0, 0, 0, time.UTC)
+	got := RenderMonth(2025, time.July, Options{Today: today, Color: true, HolidayStyle: StyleNone})
+
+	if !strings.Contains(got, reverseOn+boldOn+"19"+boldOff+reverseOff) {
+		t.Errorf("today-on-weekend not reverse+bold:\n%q", got)
+	}
+	if strings.Contains(got, grayOn+"19") {
+		t.Errorf("today must not be grayed:\n%q", got)
+	}
+}
+
+func TestPastHolidayStaysRedNotGray(t *testing.T) {
+	// today Jan 15 2025 -> New Year's Day (Wed Jan 1) is a past holiday.
+	// It must stay red, not gray (red precedence). It is a weekday, so no bold.
+	today := time.Date(2025, time.January, 15, 0, 0, 0, 0, time.UTC)
+	got := RenderMonth(2025, time.January, Options{Today: today, Color: true, HolidayStyle: StyleColor})
+
+	if !strings.Contains(got, redOn+" 1"+redOff) {
+		t.Errorf("past holiday must stay red:\n%q", got)
+	}
+	if strings.Contains(got, grayOn+" 1") {
+		t.Errorf("past holiday must not be grayed:\n%q", got)
+	}
+}
+
+func TestDateStylingColorOff(t *testing.T) {
+	// With color off, no gray/bold escapes even for past weekend days.
+	today := time.Date(2025, time.July, 15, 0, 0, 0, 0, time.UTC)
+	got := RenderMonth(2025, time.July, Options{Today: today, Color: false, HolidayStyle: StyleNone})
+
+	if strings.Contains(got, "\x1b[") {
+		t.Errorf("color off must not emit escapes:\n%q", got)
+	}
+}
+
 func TestParseHolidayStyle(t *testing.T) {
 	cases := map[string]HolidayStyle{
 		"both":  StyleBoth,
